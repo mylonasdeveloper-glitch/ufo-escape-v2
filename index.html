@@ -345,17 +345,20 @@ document.addEventListener('keyup', e => {
 canvas.addEventListener('touchstart', e => {
   e.preventDefault();
   if (state === 'start' || state === 'gameover') { startGame(); return; }
+  touchActive = true;
   keys.up = true;
   keys.down = false;
 }, { passive: false });
 
 canvas.addEventListener('touchend', e => {
   e.preventDefault();
+  touchActive = false;
   keys.up = false;
   keys.down = true;
 }, { passive: false });
 
 canvas.addEventListener('touchcancel', e => {
+  touchActive = false;
   keys.up = false;
   keys.down = true;
 }, { passive: false });
@@ -366,6 +369,7 @@ let score, highScore, lastObstacleScore;
 let ufo, obstacles, stars, comets, powerUps;
 let speed, elapsed, lastTime, shieldTime, shieldMax;
 let flashTimer;
+let touchActive = false; // tracks whether finger is currently down
 const keys = { up: false, down: false };
 
 const UFO_X = 110;
@@ -375,6 +379,7 @@ const OBS_W = 52;
 const OBS_SPACING = 240; // pixels between obstacle columns
 const BASE_SPEED = 2.4;
 const UFO_ACCEL = 0.38;
+const UFO_ACCEL_TOUCH_DOWN = 0.22; // softer drop on mobile release
 const UFO_MAX_V = 5.2;
 const SHIELD_DURATION = 5000;
 
@@ -469,6 +474,9 @@ function startGame() {
   stars = makeStars();
   comets = makeComets();
   powerUps = [];
+  touchActive = false;
+  keys.up = false;
+  keys.down = false;
 
   scoreVal.textContent = '0';
   shieldBarWrap.style.display = 'none';
@@ -509,13 +517,16 @@ function loop(ts) {
 
 // ---- Update ----
 function update(dt) {
-  // Speed ramp: +1.5% every 10s
-  speed = BASE_SPEED * (1 + Math.floor(elapsed / 10000) * 0.015);
+  // Speed ramp: +3% every 12 pts scored (noticeable but not brutal)
+  speed = BASE_SPEED * (1 + Math.floor(score / 12) * 0.03);
 
-  // UFO movement
+  // UFO movement — use softer accel when touch-releasing downward
   if (keys.up) ufo.vy = Math.max(ufo.vy - UFO_ACCEL, -UFO_MAX_V);
-  if (keys.down) ufo.vy = Math.min(ufo.vy + UFO_ACCEL, UFO_MAX_V);
-  // Gentle drift toward center when no key pressed
+  if (keys.down) {
+    const accel = (!touchActive && isTouchDevice()) ? UFO_ACCEL_TOUCH_DOWN : UFO_ACCEL;
+    ufo.vy = Math.min(ufo.vy + accel, UFO_MAX_V);
+  }
+  // Gentle drift toward center when no key pressed (desktop only effectively)
   if (!keys.up && !keys.down) ufo.vy *= 0.92;
 
   ufo.y += ufo.vy;
@@ -547,9 +558,15 @@ function update(dt) {
       score++;
       scoreVal.textContent = score;
 
-      // Spawn power-up every 15 pts (after first 15)
+      // Spawn power-up every 15 pts — place it in the NEXT obstacle's gap
       if (score > 0 && score % 15 === 0) {
-        powerUps.push(spawnPowerUp(obs.x, obs.gapY));
+        // Find the next unscored obstacle ahead (furthest right on screen)
+        const ahead = obstacles
+          .filter(o => !o.scored && o.x > UFO_X)
+          .sort((a, b) => a.x - b.x)[0];
+        if (ahead) {
+          powerUps.push(spawnPowerUp(ahead.x, ahead.gapY));
+        }
       }
     }
 
@@ -646,12 +663,38 @@ function render(ts) {
     if (!pu.collected) drawPowerUp(pu, ts);
   }
 
-  // UFO
-  const visible = !ufo.shielded || shieldTime > 1500 || Math.sin(flashTimer / 80) > 0;
-  if (visible) drawUFO(ts);
+  // UFO — 40% opacity when shielded, flash in last 1.5s
+  let ufoAlpha = 1;
+  if (ufo.shielded) {
+    if (shieldTime <= 1500) {
+      // Flash: alternate between 0.4 and full
+      ufoAlpha = Math.sin(flashTimer / 80) > 0 ? 0.4 : 1;
+    } else {
+      ufoAlpha = 0.4;
+    }
+  }
+  ctx.globalAlpha = ufoAlpha;
+  drawUFO(ts);
+  ctx.globalAlpha = 1;
 
   // Shield glow around UFO
-  if (ufo.shielded && visible) drawShieldAura();
+  if (ufo.shielded) drawShieldAura();
+
+  // "Game started" indicator — scrolling arrow for first 3s
+  if (elapsed < 3000) {
+    const fade = elapsed < 500 ? elapsed / 500 : elapsed > 2500 ? 1 - (elapsed - 2500) / 500 : 1;
+    const bounce = Math.sin(ts / 180) * 5;
+    ctx.globalAlpha = fade * 0.85;
+    ctx.fillStyle = '#00eeff';
+    ctx.font = 'bold 13px Orbitron, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('DODGING NOW →', W / 2 + 20, H / 2 + 60 + bounce);
+    // small arrow chevrons
+    ctx.font = '18px sans-serif';
+    ctx.fillText('▶▶', W / 2 + 60, H / 2 + 80 + bounce);
+    ctx.globalAlpha = 1;
+  }
 }
 
 function drawNebula() {
