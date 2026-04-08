@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UFO Escape — Dodge the Debris</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #05040f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    font-family: 'Space Mono', monospace;
+    overflow: hidden;
+  }
+
+  #wrapper {
+    position: relative;
+    width: 480px;
+    height: 640px;
+  }
+
+  canvas {
+    display: block;
+    border-radius: 12px;
+    box-shadow: 0 0 60px rgba(100, 220, 255, 0.15), 0 0 120px rgba(100, 220, 255, 0.06);
+  }
+
+  #ui-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  /* Score HUD */
+  #hud {
+    position: absolute;
+    top: 18px; left: 0; right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0 22px;
+    pointer-events: none;
+  }
+
+  .hud-block {
+    text-align: center;
+  }
+
+  .hud-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(100, 220, 255, 0.5);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+
+  .hud-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 22px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 12px rgba(100, 220, 255, 0.8);
+    line-height: 1;
+  }
+
+  #high-score-val { color: #ffd700; text-shadow: 0 0 12px rgba(255, 215, 0, 0.8); }
+
+  /* Shield HUD */
+  #shield-bar-wrap {
+    position: absolute;
+    bottom: 18px; left: 50%; transform: translateX(-50%);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  #shield-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: #00ffcc;
+    text-shadow: 0 0 8px #00ffcc;
+  }
+  #shield-bar-bg {
+    width: 140px; height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  #shield-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00ffcc, #00aaff);
+    border-radius: 3px;
+    transition: width 0.1s linear;
+    box-shadow: 0 0 8px #00ffcc;
+  }
+
+  /* Screens */
+  .screen {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(5, 4, 15, 0.88);
+    border-radius: 12px;
+    gap: 0;
+    pointer-events: all;
+  }
+
+  .screen-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 36px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 20px rgba(100, 220, 255, 0.9), 0 0 40px rgba(100,220,255,0.4);
+    letter-spacing: 2px;
+    text-align: center;
+    line-height: 1.1;
+    margin-bottom: 6px;
+  }
+
+  .screen-sub {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: rgba(100, 220, 255, 0.55);
+    letter-spacing: 1px;
+    margin-bottom: 32px;
+    text-align: center;
+  }
+
+  .stat-row {
+    display: flex;
+    gap: 36px;
+    margin-bottom: 28px;
+  }
+
+  .stat-item {
+    text-align: center;
+  }
+
+  .stat-lbl {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.35);
+    margin-bottom: 4px;
+  }
+
+  .stat-val {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 28px;
+    font-weight: 900;
+    color: #fff;
+  }
+
+  .stat-val.gold { color: #ffd700; text-shadow: 0 0 12px rgba(255,215,0,0.6); }
+
+  .btn {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    padding: 14px 40px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    background: linear-gradient(135deg, #00c8ff, #0066ff);
+    color: #fff;
+    text-shadow: none;
+    box-shadow: 0 0 20px rgba(0, 150, 255, 0.5);
+    transition: transform 0.1s, box-shadow 0.1s;
+    pointer-events: all;
+    text-transform: uppercase;
+  }
+
+  .btn:hover {
+    transform: scale(1.04);
+    box-shadow: 0 0 30px rgba(0, 180, 255, 0.7);
+  }
+
+  .btn:active { transform: scale(0.97); }
+
+  .controls-hint {
+    position: absolute;
+    bottom: 24px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: rgba(255,255,255,0.25);
+    letter-spacing: 1px;
+  }
+
+  .powerup-hint {
+    margin-top: 18px;
+    font-size: 10px;
+    color: rgba(0, 255, 204, 0.5);
+    letter-spacing: 1px;
+    text-align: center;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .ufo-deco {
+    font-size: 64px;
+    margin-bottom: 16px;
+    filter: drop-shadow(0 0 16px rgba(0,200,255,0.7));
+    animation: float 3s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  #gameover-score { color: #fff; }
+  #gameover-best { color: #ffd700; text-shadow: 0 0 12px rgba(255,215,0,0.6); }
+</style>
+</head>
+<body>
+<div id="wrapper">
+  <canvas id="c" width="480" height="640"></canvas>
+  <div id="ui-overlay">
+
+    <!-- HUD -->
+    <div id="hud">
+      <div class="hud-block">
+        <div class="hud-label">Score</div>
+        <div class="hud-value" id="score-val">0</div>
+      </div>
+      <div class="hud-block">
+        <div class="hud-label">Best</div>
+        <div class="hud-value high-score-val" id="high-score-val">0</div>
+      </div>
+    </div>
+
+    <!-- Shield bar -->
+    <div id="shield-bar-wrap">
+      <div id="shield-label">⚡ SHIELD ACTIVE</div>
+      <div id="shield-bar-bg"><div id="shield-bar-fill"></div></div>
+    </div>
+
+    <!-- Start Screen -->
+    <div class="screen" id="start-screen">
+      <div class="ufo-deco">🛸</div>
+      <div class="screen-title">UFO<br>ESCAPE</div>
+      <div class="screen-sub">dodge the debris · survive deep space</div>
+      <button class="btn" id="start-btn">LAUNCH</button>
+      <div class="powerup-hint">⚡ collect power-ups every 15 pts for 5s immunity</div>
+      <div class="controls-hint">↑ ↓  ARROW KEYS · SPACE TO START</div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div class="screen" id="gameover-screen" style="display:none">
+      <div class="ufo-deco" style="font-size:48px; margin-bottom:10px;">💥</div>
+      <div class="screen-title" style="font-size:28px; margin-bottom:4px;">SHIP DOWN</div>
+      <div class="screen-sub">your UFO didn't make it</div>
+      <div class="stat-row">
+        <div class="stat-item">
+          <div class="stat-lbl">Score</div>
+          <div class="stat-val" id="gameover-score">0</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-lbl">Best</div>
+          <div class="stat-val gold" id="gameover-best">0</div>
+        </div>
+      </div>
+      <button class="btn" id="restart-btn">TRY AGAIN</button>
+      <div class="controls-hint">SPACE TO RETRY</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+// --- DOM refs ---
+const startScreen = document.getElementById('start-screen');
+const gameoverScreen = document.getElementById('gameover-screen');
+const scoreVal = document.getElementById('score-val');
+const highScoreVal = document.getElementById('high-score-val');
+const gameoverScore = document.getElementById('gameover-score');
+const gameoverBest = document.getElementById('gameover-best');
+const shieldBarWrap = document.getElementById('shield-bar-wrap');
+const shieldBarFill = document.getElementById('shield-bar-fill');
+
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('restart-btn').addEventListener('click', startGame);
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') {
+    if (state === 'start' || state === 'gameover') startGame();
+  }
+  if (e.code === 'ArrowUp') keys.up = true;
+  if (e.code === 'ArrowDown') keys.down = true;
+});
+document.addEventListener('keyup', e => {
+  if (e.code === 'ArrowUp') keys.up = false;
+  if (e.code === 'ArrowDown') keys.down = false;
+});
+
+// --- Game state ---
+let state = 'start';
+let score, highScore, lastObstacleScore;
+let ufo, obstacles, stars, comets, powerUps;
+let speed, elapsed, lastTime, shieldTime, shieldMax;
+let flashTimer;
+const keys = { up: false, down: false };
+
+const UFO_X = 110;
+const UFO_W = 56, UFO_H = 28;
+const GAP = 200;
+const OBS_W = 52;
+const OBS_SPACING = 240; // pixels between obstacle columns
+const BASE_SPEED = 2.4;
+const UFO_ACCEL = 0.38;
+const UFO_MAX_V = 5.2;
+const SHIELD_DURATION = 5000;
+
+highScore = parseInt(localStorage.getItem('ufo_hs') || '0');
+highScoreVal.textContent = highScore;
+
+// ---- Stars ----
+function makeStars() {
+  const arr = [];
+  for (let i = 0; i < 120; i++) {
+    arr.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: Math.random() * 1.6 + 0.3,
+      brightness: Math.random(),
+      twinkleSpeed: 0.01 + Math.random() * 0.03,
+      twinkleOffset: Math.random() * Math.PI * 2,
+    });
+  }
+  return arr;
+}
+
+function makeComets() {
+  return [];
+}
+
+function spawnComet() {
+  return {
+    x: W + 20,
+    y: Math.random() * H * 0.6 + 10,
+    vx: -(2 + Math.random() * 3),
+    vy: 0.4 + Math.random() * 0.6,
+    len: 40 + Math.random() * 60,
+    alpha: 0.6 + Math.random() * 0.4,
+    dead: false,
+  };
+}
+
+// ---- Obstacles ----
+function makeObstacle(x) {
+  // gap start is random but ensures gap is fully inside frame with margin
+  const margin = 40;
+  const gapY = margin + Math.random() * (H - GAP - margin * 2);
+  return { x, gapY, scored: false };
+}
+
+function initObstacles() {
+  const arr = [];
+  // First obstacle starts offscreen to give player breathing room
+  let startX = W + 200;
+  for (let i = 0; i < 5; i++) {
+    arr.push(makeObstacle(startX + i * (OBS_W + OBS_SPACING)));
+  }
+  return arr;
+}
+
+// ---- Power-ups ----
+function spawnPowerUp(x, gapY) {
+  return {
+    x: x + OBS_W / 2,
+    y: gapY + GAP / 2,
+    r: 14,
+    collected: false,
+    pulseT: 0,
+  };
+}
+
+// ---- UFO ----
+function makeUFO() {
+  return {
+    x: UFO_X,
+    y: H / 2,
+    vy: 0,
+    shielded: false,
+    dead: false,
+  };
+}
+
+// ---- Start / Reset ----
+function startGame() {
+  score = 0;
+  lastObstacleScore = 0;
+  elapsed = 0;
+  lastTime = null;
+  speed = BASE_SPEED;
+  shieldTime = 0;
+  shieldMax = SHIELD_DURATION;
+  flashTimer = 0;
+
+  ufo = makeUFO();
+  obstacles = initObstacles();
+  stars = makeStars();
+  comets = makeComets();
+  powerUps = [];
+
+  scoreVal.textContent = '0';
+  shieldBarWrap.style.display = 'none';
+
+  startScreen.style.display = 'none';
+  gameoverScreen.style.display = 'none';
+
+  state = 'playing';
+  requestAnimationFrame(loop);
+}
+
+function endGame() {
+  state = 'gameover';
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem('ufo_hs', highScore);
+  }
+  highScoreVal.textContent = highScore;
+  gameoverScore.textContent = score;
+  gameoverBest.textContent = highScore;
+  shieldBarWrap.style.display = 'none';
+  gameoverScreen.style.display = 'flex';
+}
+
+// ---- Main loop ----
+function loop(ts) {
+  if (state !== 'playing') return;
+
+  const dt = lastTime ? Math.min(ts - lastTime, 50) : 16;
+  lastTime = ts;
+  elapsed += dt;
+
+  update(dt);
+  render(ts);
+
+  requestAnimationFrame(loop);
+}
+
+// ---- Update ----
+function update(dt) {
+  // Speed ramp: +1.5% every 10s
+  speed = BASE_SPEED * (1 + Math.floor(elapsed / 10000) * 0.015);
+
+  // UFO movement
+  if (keys.up) ufo.vy = Math.max(ufo.vy - UFO_ACCEL, -UFO_MAX_V);
+  if (keys.down) ufo.vy = Math.min(ufo.vy + UFO_ACCEL, UFO_MAX_V);
+  // Gentle drift toward center when no key pressed
+  if (!keys.up && !keys.down) ufo.vy *= 0.92;
+
+  ufo.y += ufo.vy;
+
+  // Clamp to screen
+  ufo.y = Math.max(UFO_H / 2 + 2, Math.min(H - UFO_H / 2 - 2, ufo.y));
+
+  // Shield timer
+  if (ufo.shielded) {
+    shieldTime -= dt;
+    if (shieldTime <= 0) {
+      shieldTime = 0;
+      ufo.shielded = false;
+      shieldBarWrap.style.display = 'none';
+    } else {
+      shieldBarFill.style.width = (shieldTime / shieldMax * 100) + '%';
+      // Flash in last 1.5s
+      if (shieldTime < 1500) flashTimer += dt;
+    }
+  }
+
+  // Move & recycle obstacles
+  for (let obs of obstacles) {
+    obs.x -= speed;
+
+    // Passed UFO → score
+    if (!obs.scored && obs.x + OBS_W < UFO_X - UFO_W / 2) {
+      obs.scored = true;
+      score++;
+      scoreVal.textContent = score;
+
+      // Spawn power-up every 15 pts (after first 15)
+      if (score > 0 && score % 15 === 0) {
+        powerUps.push(spawnPowerUp(obs.x, obs.gapY));
+      }
+    }
+
+    // Recycle
+    if (obs.x + OBS_W < 0) {
+      obs.x = Math.max(...obstacles.map(o => o.x)) + OBS_W + OBS_SPACING;
+      obs.gapY = 40 + Math.random() * (H - GAP - 80);
+      obs.scored = false;
+    }
+
+    // Collision
+    if (!ufo.shielded) {
+      const ux = UFO_X, uy = ufo.y;
+      const hw = UFO_W / 2 - 4, hh = UFO_H / 2 - 4;
+      // Check top pipe
+      if (ux + hw > obs.x && ux - hw < obs.x + OBS_W) {
+        if (uy - hh < obs.gapY) { endGame(); return; }
+        if (uy + hh > obs.gapY + GAP) { endGame(); return; }
+      }
+    }
+  }
+
+  // Power-ups
+  for (let pu of powerUps) {
+    if (pu.collected) continue;
+    pu.x -= speed;
+    pu.pulseT += dt;
+
+    // Collect
+    const dx = UFO_X - pu.x, dy = ufo.y - pu.y;
+    if (Math.sqrt(dx * dx + dy * dy) < UFO_W / 2 + pu.r) {
+      pu.collected = true;
+      ufo.shielded = true;
+      shieldTime = SHIELD_DURATION;
+      shieldMax = SHIELD_DURATION;
+      flashTimer = 0;
+      shieldBarWrap.style.display = 'flex';
+      shieldBarFill.style.width = '100%';
+    }
+  }
+  // remove off-screen or collected
+  powerUps = powerUps.filter(pu => !pu.collected && pu.x > -40);
+
+  // Comets
+  for (let c of comets) {
+    c.x += c.vx;
+    c.y += c.vy;
+    if (c.x < -c.len - 10) c.dead = true;
+  }
+  comets = comets.filter(c => !c.dead);
+
+  // Spawn comets randomly
+  if (Math.random() < 0.004) comets.push(spawnComet());
+}
+
+// ---- Render ----
+function render(ts) {
+  // Background
+  ctx.fillStyle = '#06050f';
+  ctx.fillRect(0, 0, W, H);
+
+  // Nebula blobs
+  drawNebula();
+
+  // Stars
+  for (let s of stars) {
+    const twinkle = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(ts * s.twinkleSpeed + s.twinkleOffset));
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,${twinkle * s.brightness})`;
+    ctx.fill();
+  }
+
+  // Comets
+  for (let c of comets) {
+    const grad = ctx.createLinearGradient(c.x, c.y, c.x + c.len, c.y - c.vy * (c.len / Math.abs(c.vx)));
+    grad.addColorStop(0, `rgba(255,255,255,${c.alpha})`);
+    grad.addColorStop(1, 'rgba(150,200,255,0)');
+    ctx.beginPath();
+    ctx.moveTo(c.x, c.y);
+    ctx.lineTo(c.x + c.len, c.y - c.vy * (c.len / Math.abs(c.vx)));
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  // Obstacles
+  for (let obs of obstacles) {
+    drawObstacle(obs);
+  }
+
+  // Power-ups
+  for (let pu of powerUps) {
+    if (!pu.collected) drawPowerUp(pu, ts);
+  }
+
+  // UFO
+  const visible = !ufo.shielded || shieldTime > 1500 || Math.sin(flashTimer / 80) > 0;
+  if (visible) drawUFO(ts);
+
+  // Shield glow around UFO
+  if (ufo.shielded && visible) drawShieldAura();
+}
+
+function drawNebula() {
+  // Subtle colored fog patches
+  const patches = [
+    { x: 60, y: 200, r: 200, c: 'rgba(30,10,80,0.18)' },
+    { x: 380, y: 420, r: 180, c: 'rgba(0,30,60,0.15)' },
+    { x: 240, y: 100, r: 160, c: 'rgba(0,40,50,0.12)' },
+  ];
+  for (let p of patches) {
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+    g.addColorStop(0, p.c);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, p.r, p.r * 0.6, 0.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawObstacle(obs) {
+  const topH = obs.gapY;
+  const botY = obs.gapY + GAP;
+  const botH = H - botY;
+  const x = obs.x;
+  const w = OBS_W;
+
+  // Metal gradient
+  const metalGrad = (y1, y2) => {
+    const g = ctx.createLinearGradient(x, 0, x + w, 0);
+    g.addColorStop(0, '#1a2a3a');
+    g.addColorStop(0.25, '#2e4a60');
+    g.addColorStop(0.5, '#3a6080');
+    g.addColorStop(0.75, '#1e3a50');
+    g.addColorStop(1, '#0f1e2a');
+    return g;
+  };
+
+  // Draw top pipe body
+  ctx.fillStyle = metalGrad(0, topH);
+  roundRect(ctx, x, 0, w, topH, [0, 0, 6, 6]);
+  ctx.fill();
+
+  // Top pipe edge cap (bottom of top pipe)
+  const capH = 18, capW = w + 10;
+  ctx.fillStyle = '#2a4a60';
+  ctx.strokeStyle = '#4a8aaa';
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, x - 5, topH - capH, capW, capH, [0, 0, 5, 5]);
+  ctx.fill();
+  ctx.stroke();
+
+  // Rivet dots on cap
+  drawRivets(x - 5, topH - capH, capW, capH);
+
+  // Panel lines on top pipe
+  drawPanelLines(x, 0, w, topH);
+
+  // Bottom pipe body
+  ctx.fillStyle = metalGrad(botY, H);
+  roundRect(ctx, x, botY, w, botH, [6, 6, 0, 0]);
+  ctx.fill();
+
+  // Bottom pipe edge cap (top of bottom pipe)
+  ctx.fillStyle = '#2a4a60';
+  ctx.strokeStyle = '#4a8aaa';
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, x - 5, botY, capW, capH, [5, 5, 0, 0]);
+  ctx.fill();
+  ctx.stroke();
+
+  drawRivets(x - 5, botY, capW, capH);
+  drawPanelLines(x, botY + capH, w, botH - capH);
+
+  // Glowing edge strips
+  ctx.strokeStyle = 'rgba(0, 180, 255, 0.25)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x + w - 3, 0);
+  ctx.lineTo(x + w - 3, topH);
+  ctx.moveTo(x + 3, 0);
+  ctx.lineTo(x + 3, topH);
+  ctx.moveTo(x + w - 3, botY);
+  ctx.lineTo(x + w - 3, H);
+  ctx.moveTo(x + 3, botY);
+  ctx.lineTo(x + 3, H);
+  ctx.stroke();
+}
+
+function drawRivets(x, y, w, h) {
+  ctx.fillStyle = '#1a3a50';
+  const positions = [
+    [x + 8, y + h / 2],
+    [x + w - 8, y + h / 2],
+    [x + w / 2, y + h / 2],
+  ];
+  for (let [rx, ry] of positions) {
+    ctx.beginPath();
+    ctx.arc(rx, ry, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,150,200,0.4)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+}
+
+function drawPanelLines(x, y, w, h) {
+  ctx.strokeStyle = 'rgba(0,100,160,0.2)';
+  ctx.lineWidth = 0.8;
+  const step = 30;
+  for (let ly = y + step; ly < y + h - 4; ly += step) {
+    ctx.beginPath();
+    ctx.moveTo(x + 4, ly);
+    ctx.lineTo(x + w - 4, ly);
+    ctx.stroke();
+  }
+}
+
+function roundRect(ctx, x, y, w, h, radii) {
+  const [tl, tr, br, bl] = Array.isArray(radii) ? radii : [radii, radii, radii, radii];
+  ctx.beginPath();
+  ctx.moveTo(x + tl, y);
+  ctx.lineTo(x + w - tr, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + tr);
+  ctx.lineTo(x + w, y + h - br);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - br, y + h);
+  ctx.lineTo(x + bl, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - bl);
+  ctx.lineTo(x, y + tl);
+  ctx.quadraticCurveTo(x, y, x + tl, y);
+  ctx.closePath();
+}
+
+function drawUFO(ts) {
+  const x = UFO_X, y = ufo.y;
+  const t = ts / 1000;
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  // Engine glow underneath
+  const glowR = ctx.createRadialGradient(0, 8, 0, 0, 8, 24);
+  glowR.addColorStop(0, 'rgba(0, 220, 255, 0.35)');
+  glowR.addColorStop(1, 'rgba(0, 100, 255, 0)');
+  ctx.fillStyle = glowR;
+  ctx.beginPath();
+  ctx.ellipse(0, 8, 22, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Beam (subtle)
+  const beamGrad = ctx.createLinearGradient(0, 10, 0, 60);
+  beamGrad.addColorStop(0, 'rgba(0, 220, 255, 0.12)');
+  beamGrad.addColorStop(1, 'rgba(0, 220, 255, 0)');
+  ctx.fillStyle = beamGrad;
+  ctx.beginPath();
+  ctx.moveTo(-18, 10);
+  ctx.lineTo(18, 10);
+  ctx.lineTo(26, 60);
+  ctx.lineTo(-26, 60);
+  ctx.closePath();
+  ctx.fill();
+
+  // Saucer body (bottom disc)
+  const bodyGrad = ctx.createLinearGradient(0, -4, 0, 14);
+  bodyGrad.addColorStop(0, '#5a8aaa');
+  bodyGrad.addColorStop(0.4, '#3a6080');
+  bodyGrad.addColorStop(1, '#1a3050');
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, 6, UFO_W / 2, UFO_H / 2 - 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Metallic rim highlight
+  ctx.strokeStyle = 'rgba(100,200,255,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.ellipse(0, 6, UFO_W / 2 - 1, UFO_H / 2 - 5, 0, 0, Math.PI);
+  ctx.stroke();
+
+  // Dome
+  const domeGrad = ctx.createRadialGradient(-6, -12, 2, 0, -8, 22);
+  domeGrad.addColorStop(0, 'rgba(200,240,255,0.85)');
+  domeGrad.addColorStop(0.4, 'rgba(100,200,255,0.5)');
+  domeGrad.addColorStop(1, 'rgba(20,80,180,0.4)');
+  ctx.fillStyle = domeGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, 2, 18, 16, 0, Math.PI, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(100,180,255,0.4)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.ellipse(0, 2, 18, 16, 0, Math.PI, Math.PI * 2);
+  ctx.stroke();
+
+  // Blinking lights on rim
+  const lights = [
+    { angle: 0, color: '#ff4040' },
+    { angle: Math.PI / 2, color: '#40ff80' },
+    { angle: Math.PI, color: '#4080ff' },
+    { angle: (3 * Math.PI) / 2, color: '#ffff40' },
+  ];
+  for (let l of lights) {
+    const blink = Math.sin(t * 4 + l.angle) > 0.3;
+    const lx = Math.cos(l.angle) * (UFO_W / 2 - 6);
+    const ly = 6 + Math.sin(l.angle) * 4;
+    ctx.beginPath();
+    ctx.arc(lx, ly, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = blink ? l.color : 'rgba(20,30,40,0.8)';
+    if (blink) {
+      ctx.shadowColor = l.color;
+      ctx.shadowBlur = 6;
+    }
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  ctx.restore();
+}
+
+function drawShieldAura() {
+  const x = UFO_X, y = ufo.y;
+  const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 200);
+  const g = ctx.createRadialGradient(x, y, UFO_W / 2 - 4, x, y, UFO_W / 2 + 20);
+  g.addColorStop(0, `rgba(0,255,200,${0.18 * pulse})`);
+  g.addColorStop(1, 'rgba(0,200,255,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, UFO_W / 2 + 20, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = `rgba(0,255,200,${0.5 * pulse})`;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(x, y, UFO_W / 2 + 6, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+function drawPowerUp(pu, ts) {
+  const pulse = 0.85 + 0.15 * Math.sin(pu.pulseT / 300);
+  const x = pu.x, y = pu.y, r = pu.r * pulse;
+
+  // Outer glow
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r + 14);
+  g.addColorStop(0, 'rgba(0,255,180,0.3)');
+  g.addColorStop(1, 'rgba(0,255,180,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, r + 14, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Orb
+  const orb = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
+  orb.addColorStop(0, '#aaffee');
+  orb.addColorStop(0.4, '#00ffaa');
+  orb.addColorStop(1, '#006655');
+  ctx.fillStyle = orb;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Lightning bolt icon
+  ctx.fillStyle = '#fff';
+  ctx.font = `bold ${Math.round(r * 1.1)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('⚡', x, y);
+}
+</script>
+</body>
+</html>
