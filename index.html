@@ -23,12 +23,16 @@
     position: relative;
     width: 480px;
     height: 640px;
+    transform-origin: top center;
   }
 
   canvas {
     display: block;
     border-radius: 12px;
     box-shadow: 0 0 60px rgba(100, 220, 255, 0.15), 0 0 120px rgba(100, 220, 255, 0.06);
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   #ui-overlay {
@@ -256,7 +260,7 @@
       <div class="screen-sub">dodge the debris · survive deep space</div>
       <button class="btn" id="start-btn">LAUNCH</button>
       <div class="powerup-hint">⚡ collect power-ups every 15 pts for 5s immunity</div>
-      <div class="controls-hint">↑ ↓  ARROW KEYS · SPACE TO START</div>
+      <div class="controls-hint" id="controls-hint">↑ ↓  ARROW KEYS · SPACE TO START</div>
     </div>
 
     <!-- Game Over Screen -->
@@ -275,7 +279,7 @@
         </div>
       </div>
       <button class="btn" id="restart-btn">TRY AGAIN</button>
-      <div class="controls-hint">SPACE TO RETRY</div>
+      <div class="controls-hint" id="gameover-hint">SPACE TO RETRY</div>
     </div>
 
   </div>
@@ -285,6 +289,32 @@
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
+
+// --- Responsive scaling ---
+function scaleGame() {
+  const wrapper = document.getElementById('wrapper');
+  const scaleX = window.innerWidth / 480;
+  const scaleY = window.innerHeight / 640;
+  const scale = Math.min(scaleX, scaleY, 1); // never upscale beyond 1 on desktop
+  wrapper.style.transform = `scale(${scale})`;
+  // Center vertically too
+  const offsetY = Math.max(0, (window.innerHeight - 640 * scale) / 2);
+  wrapper.style.marginTop = offsetY + 'px';
+}
+scaleGame();
+window.addEventListener('resize', scaleGame);
+
+// --- Detect touch device ---
+const isTouchDevice = () => window.matchMedia('(pointer: coarse)').matches;
+function updateHints() {
+  const touch = isTouchDevice();
+  const ch = document.getElementById('controls-hint');
+  const gh = document.getElementById('gameover-hint');
+  if (ch) ch.textContent = touch ? 'HOLD TO GO UP · RELEASE TO GO DOWN' : '↑ ↓  ARROW KEYS · SPACE TO START';
+  if (gh) gh.textContent = touch ? 'TAP TO RETRY' : 'SPACE TO RETRY';
+}
+updateHints();
+window.addEventListener('resize', updateHints);
 
 // --- DOM refs ---
 const startScreen = document.getElementById('start-screen');
@@ -309,6 +339,26 @@ document.addEventListener('keyup', e => {
   if (e.code === 'ArrowUp') keys.up = false;
   if (e.code === 'ArrowDown') keys.down = false;
 });
+
+// --- Touch controls ---
+// Hold anywhere on canvas = go up, release = stop (drift to neutral)
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (state === 'start' || state === 'gameover') { startGame(); return; }
+  keys.up = true;
+  keys.down = false;
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  keys.up = false;
+  keys.down = false;
+}, { passive: false });
+
+canvas.addEventListener('touchcancel', e => {
+  keys.up = false;
+  keys.down = false;
+}, { passive: false });
 
 // --- Game state ---
 let state = 'start';
