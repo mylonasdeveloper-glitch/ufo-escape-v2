@@ -341,7 +341,7 @@ document.addEventListener('keyup', e => {
 });
 
 // --- Touch controls ---
-// Hold anywhere on canvas = go up, release = stop (drift to neutral)
+// Hold = go up, release = go down (Flappy Bird style for mobile)
 canvas.addEventListener('touchstart', e => {
   e.preventDefault();
   if (state === 'start' || state === 'gameover') { startGame(); return; }
@@ -352,12 +352,12 @@ canvas.addEventListener('touchstart', e => {
 canvas.addEventListener('touchend', e => {
   e.preventDefault();
   keys.up = false;
-  keys.down = false;
+  keys.down = true;
 }, { passive: false });
 
 canvas.addEventListener('touchcancel', e => {
   keys.up = false;
-  keys.down = false;
+  keys.down = true;
 }, { passive: false });
 
 // --- Game state ---
